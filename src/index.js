@@ -14,7 +14,11 @@ const invoiceRoute = require("./invoice/routes/invoice");
 dotenv.config();
 const PORT = process.env.PORT || 3000;
 // CONNECTION TO DATABASE
-var uri = `mongodb://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}`;
+var usernamePassword = ''
+if (process.env.DB_USERNAME || process.env.DB_PASSWORD) {
+    usernamePassword = `${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@`
+}
+var uri = `mongodb://${usernamePassword}${process.env.DB_HOST}:${process.env.DB_PORT}`;
 var options = {
     useNewUrlParser: true,
     useUnifiedTopology: true 
