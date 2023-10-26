@@ -3,3 +3,6 @@
 
 # ignore . files
 .*
+
+# ignore node modules
+node_modules
