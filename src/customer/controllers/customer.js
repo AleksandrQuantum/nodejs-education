@@ -52,7 +52,7 @@ module.exports.getById = async(req, res) => {
         const { cusId } = req.params;
         const customer = await Customer.findById(cusId);
         if (!customer) {
-            return res.status(404).send("Supplier not found");
+            return res.status(404).send("Customer not found");
         }
         return res.send(customer);
     } catch (err) {

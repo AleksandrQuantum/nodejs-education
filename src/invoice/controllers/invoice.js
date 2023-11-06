@@ -1,37 +1,36 @@
 const Joi = require('joi');
+const mongoose = require("mongoose");
 const Customer = require('../../customer/models/customer');
 const Supplier = require('../../supplier/models/supplier');
 const Invoice = require('../models/invoice');
 const User = require('../../user/models/user');
 
-// VALIDATION SCHEMA
-const validationDict = {
-    name: Joi.string().min(2).max(255).required(),
-    currency: Joi.string().min(3).max(3).required(),
-    amount: Joi.number().required(),
-    status: Joi.string().min(2).max(15).required(),
-}
-
 module.exports.createByCustomer = async(req, res) => {
-    // VALIDATION OF INVOICE INPUTS
-    validationDict['supplierId'] = Joi.string().required();
-    const createInvoiceSchema = Joi.object(validationDict);
-    const { err } = await createInvoiceSchema.validateAsync(req.body);
-    if (err) {
-        return res.status(400).send(err.details[0].message);
-    }
-    // CHECKING IF INVOICE ALREADY EXISTS
-    const invoiceExists = await Invoice.findOne({ name: req.body.name });
-    if (invoiceExists) {
-        return res.status(400).send("Invoice already exists");
-    }
-    // CHECKING IF SUPPLIER IS VALID
-    const supplierExists = await Supplier.findOne({ _id: req.body.supplierId });
-    if (!supplierExists) {
-        return res.status(400).send("Supplier does not exist");
-    }
-
     try {
+        // VALIDATION SCHEMA
+        const validationDict = {
+            name: Joi.string().min(2).max(255).required(),
+            currency: Joi.string().min(3).max(3).required(),
+            amount: Joi.number().required(),
+            status: Joi.string().min(2).max(15).required(),
+            supplierId: Joi.string().required()
+        }
+        // VALIDATION OF INVOICE INPUTS
+        const createInvoiceSchema = Joi.object(validationDict);
+        const { err } = await createInvoiceSchema.validateAsync(req.body);
+        if (err) {
+            return res.status(400).send(err.details[0].message);
+        }
+        // CHECKING IF INVOICE ALREADY EXISTS
+        const invoiceExists = await Invoice.findOne({ name: req.body.name });
+        if (invoiceExists) {
+            return res.status(400).send("Invoice already exists");
+        }
+        // CHECKING IF SUPPLIER IS VALID
+        const supp = await Supplier.findById(req.body.supplierId);
+        if (!supp) {
+            return res.status(400).send("Supplier does not exist");
+    }
         // FIND WHO MAKE REQUEST AND VALIDATE ITS DATA
         const user = await User.findById(req.userId);
         if (user.role != 'CUSTOMER') {
@@ -39,6 +38,10 @@ module.exports.createByCustomer = async(req, res) => {
         }
         if (!user.customerId) {
             return res.status(400).send("Your user has empty customerId");
+        }
+        const cus = await Customer.findById(user.customerId._id);
+        if (!cus) {
+            return res.status(400).send("Your user customerId is not valid");
         }
 
         const newInvoice = new Invoice({
@@ -49,8 +52,11 @@ module.exports.createByCustomer = async(req, res) => {
             amount: req.body.amount,
             status: req.body.status,
         });
-
+        cus.invoices.push(newInvoice);
+        supp.invoices.push(newInvoice);
         newInvoice.save();
+        cus.save();
+        supp.save();
         return res.send("Invoice created successfully");
     } catch (err) {
         return res.status(500).send(err.message);
@@ -58,32 +64,43 @@ module.exports.createByCustomer = async(req, res) => {
 };
 
 module.exports.createBySupplier = async(req, res) => {
-    // VALIDATION OF INVOICE INPUTS
-    validationDict['customerId'] = Joi.string().required();
-    const createInvoiceSchema = Joi.object(validationDict);
-    const { err } = await createInvoiceSchema.validateAsync(req.body);
-    if (err) {
-        return res.status(400).send(err.details[0].message);
-    }
-    // CHECKING IF INVOICE ALREADY EXISTS
-    const invoiceExists = await Invoice.findOne({ name: req.body.name });
-    if (invoiceExists) {
-        return res.status(400).send("Invoice already exists");
-    }
-    // CHECKING IF CUSTOMER IS VALID
-    const customerExists = await Customer.findOne({ _id: req.body.customerId });
-    if (!customerExists) {
-        return res.status(400).send("Customer does not exist");
+    try {
+        // VALIDATION SCHEMA
+        const validationDict = {
+            name: Joi.string().min(2).max(255).required(),
+            currency: Joi.string().min(3).max(3).required(),
+            amount: Joi.number().required(),
+            status: Joi.string().min(2).max(15).required(),
+            customerId: Joi.string().required()
+        }
+        // VALIDATION OF INVOICE INPUTS
+        const createInvoiceSchema = Joi.object(validationDict);
+        const { err } = await createInvoiceSchema.validateAsync(req.body);
+        if (err) {
+            return res.status(400).send(err.details[0].message);
+        }
+        // CHECKING IF INVOICE ALREADY EXISTS
+        const invoiceExists = await Invoice.findOne({ name: req.body.name });
+        if (invoiceExists) {
+            return res.status(400).send("Invoice already exists");
+        }
+        // CHECKING IF CUSTOMER IS VALID
+        const cus = await Customer.findById(req.body.customerId);
+        if (!cus) {
+            return res.status(400).send("Customer does not exist");
     }
 
-    try {
         // FIND WHO MAKE REQUEST AND VALIDATE ITS DATA
         const user = await User.findById(req.userId);
         if (user.role != 'SUPPLIER') {
             return res.status(400).send("Your role is not supplier, please choose another endpoint");
         }
         if (!user.supplierId) {
-            return res.status(400).send("Your user has not supplierId");
+            return res.status(400).send("Your user has empty supplierId");
+        }
+        const supp = await Supplier.findById(user.supplierId._id);
+        if (!supp) {
+            return res.status(400).send("Your user supplierId is not valid");
         }
 
         const newInvoice = new Invoice({
@@ -94,8 +111,11 @@ module.exports.createBySupplier = async(req, res) => {
             amount: req.body.amount,
             status: req.body.status,
         });
-
+        cus.invoices.push(newInvoice);
+        supp.invoices.push(newInvoice);
         newInvoice.save();
+        cus.save();
+        supp.save();
         return res.send("Invoice created successfully");
     } catch (err) {
         return res.status(500).send(err.message);
@@ -152,7 +172,7 @@ module.exports.getAllByCustomer = async(req, res) => {
             return res.status(400).send("Your role is not customer, please choose another endpoint");
         }
         const invoices = await Invoice.find({ customerId: user.customerId });
-        if (!invoices) {
+        if (invoices.length == 0) {
             return res.status(404).send("Invoices not found");
         }
         return res.send(invoices);
@@ -169,7 +189,7 @@ module.exports.getAllBySupplier = async(req, res) => {
             return res.status(400).send("Your role is not supplier, please choose another endpoint");
         }
         const invoices = await Invoice.find({ supplierId: user.supplierId });
-        if (!invoices) {
+        if (invoices.length == 0) {
             return res.status(404).send("Invoices not found");
         }
         return res.send(invoices);
@@ -180,8 +200,14 @@ module.exports.getAllBySupplier = async(req, res) => {
 
 exports.updateByCustomer = async (req, res) => {
     try {
+        const validationDict = {
+            name: Joi.string().min(2).max(255).required(),
+            currency: Joi.string().min(3).max(3).required(),
+            amount: Joi.number().required(),
+            status: Joi.string().min(2).max(15).required(),
+            supplierId: Joi.string().required()
+        }
         // VALIDATION OF INVOICE INPUTS
-        validationDict['supplierId'] = Joi.string().required();
         const updateInvoiceSchema = Joi.object(validationDict);
         const { err } = await updateInvoiceSchema.validateAsync(req.body);
         if (err) {
@@ -192,11 +218,8 @@ exports.updateByCustomer = async (req, res) => {
         if (user.role != 'CUSTOMER') {
             return res.status(400).send("Your role is not customer, please choose another endpoint");
         }
-        if (!user.customerId) {
-            return res.status(400).send("Your user has empty customerId");
-        }
         // CHECKING IF SUPPLIER IS VALID
-        const supplierExists = await Supplier.findOne({ _id: req.body.supplierId });
+        const supplierExists = await Supplier.findById(req.body.supplierId);
         if (!supplierExists) {
             return res.status(400).send("Supplier does not exist");
         }
@@ -211,7 +234,7 @@ exports.updateByCustomer = async (req, res) => {
             status: req.body.status,
         }
         await Invoice.findByIdAndUpdate(invId, {$set: data}, { new: true });
-        return res.send("Invoice updated");
+        return res.send("Invoice updated successfully");
     } catch (error) {
         return res.status(500).send(error.message);
     }
@@ -219,8 +242,14 @@ exports.updateByCustomer = async (req, res) => {
 
 exports.updateBySupplier = async (req, res) => {
     try {
+        const validationDict = {
+            name: Joi.string().min(2).max(255).required(),
+            currency: Joi.string().min(3).max(3).required(),
+            amount: Joi.number().required(),
+            status: Joi.string().min(2).max(15).required(),
+            customerId: Joi.string().required()
+        }
         // VALIDATION OF INVOICE INPUTS
-        validationDict['customerId'] = Joi.string().required();
         const updateInvoiceSchema = Joi.object(validationDict);
         const { err } = await updateInvoiceSchema.validateAsync(req.body);
         if (err) {
@@ -247,7 +276,7 @@ exports.updateBySupplier = async (req, res) => {
             status: req.body.status,
         }
         await Invoice.findByIdAndUpdate(invId, {$set: data}, { new: true });
-        return res.send("Invoice updated");
+        return res.send("Invoice updated successfully");
     } catch (error) {
         return res.status(500).send(error.message);
     }

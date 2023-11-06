@@ -9,6 +9,14 @@ module.exports.login = async (req, res, next) => {
         email: Joi.string().min(6).max(255).required(),
         password: Joi.string().min(6).max(255).required(),
     });
+    try {
+        const { err } = await loginSchema.validateAsync(req.body);
+        if (err) {
+            return res.status(400).send(err.details[0].message);
+        }
+    } catch (err) {
+        return res.status(400).send(err.message);
+    }
     // CHECKING IF USER EMAIL
     const user = await User.findOne({ email: req.body.email });
     if (!user) {
@@ -21,13 +29,8 @@ module.exports.login = async (req, res, next) => {
     }
     // VALIDATION OF USER INPUTS
     try {
-        const { err } = await loginSchema.validateAsync(req.body);
-        if (err) {
-            return res.status(400).send(err.details[0].message);
-        } else {
-            const token = jwt.sign({_id: user._id}, process.env.TOKEN_SECRET);
-            res.header("Auth-Token", token).send(token);
-        }
+        const token = jwt.sign({_id: user._id}, process.env.TOKEN_SECRET);
+        res.header("Auth-Token", token).send(token);
     } catch (err) {
         return res.status(500).send(err.message);
     }
@@ -40,8 +43,8 @@ module.exports.verify = function(req, res, next) {
     }
 
     try {
-        const verified = jwt.verify(token, process.env.TOKEN_SECRET);
-        req.userId = verified._id;
+        const user = jwt.verify(token, process.env.TOKEN_SECRET);
+        req.userId = user._id;
         next();
     } catch (err) {
         return res.status(400).send("Invalid token");

@@ -9,19 +9,23 @@ module.exports.create = async(req, res) => {
         lname: Joi.string().min(2).max(255).required(),
         email: Joi.string().min(6).max(255).required().email(),
         password: Joi.string().min(2).max(255).required(),
+        role: Joi.string().min(2).max(255),
+        customerId: Joi.string(),
+        supplierId: Joi.string(),
     })
-    // CHECKING IF USER EMAIL ALREADY EXISTS
-    const emailExists = await User.findOne({ email: req.body.email });
-    if (emailExists) {
-        return res.status(400).send("Email already exists");
-    }
+
     try {
         // VALIDATION OF USER INPUTS
         const { err } = await createUserSchema.validateAsync(req.body);
         if (err) {
             return res.status(400).send(err.details[0].message);
         }
-        // HASHING THE PASS
+        // CHECKING IF USER EMAIL ALREADY EXISTS
+        const emailExists = await User.findOne({ email: req.body.email });
+        if (emailExists) {
+            return res.status(400).send("Email already exists");
+        }
+        // HASHING THE PASS2
         const salt = await bcrypt.genSalt(10);
         hashedPassword = await bcrypt.hash(req.body.password, salt);
 
@@ -30,6 +34,9 @@ module.exports.create = async(req, res) => {
             lname: req.body.lname,
             email: req.body.email,
             password: hashedPassword,
+            role: req.body.role,
+            customerId: req.body.customerId,
+            supplierId: req.body.supplierId,
         });
     
         newUser.save();

@@ -11,12 +11,6 @@ module.exports.create = async(req, res) => {
         contactNumber: Joi.string().min(10).max(15).required(),
         userId: Joi.string().required()
     });
-    
-    // CHECKING IF SUPPLIER EMAIL ALREADY EXISTS
-    const emailExists = await Supplier.findOne({ email: req.body.email });
-    if (emailExists) {
-        return res.status(400).send("Email already exists");
-    }
 
     try {
         // VALIDATION OF SUPPLIER INPUTS
@@ -25,12 +19,19 @@ module.exports.create = async(req, res) => {
             return res.status(400).send(err.details[0].message);
         }
 
+        // CHECKING IF SUPPLIER EMAIL ALREADY EXISTS
+        const emailExists = await Supplier.findOne({ email: req.body.email });
+        if (emailExists) {
+            return res.status(400).send("Email already exists");
+        }
+
         const newSupplier = new Supplier({
             name: req.body.name,
             address: req.body.address,
             email: req.body.email,
             contactNumber: req.body.contactNumber,
-            userId: req.body.userId
+            userId: req.body.userId,
+            role: req.body.role
         });
 
         // SET ROLE FOR USER
