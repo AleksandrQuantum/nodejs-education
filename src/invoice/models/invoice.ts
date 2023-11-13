@@ -1,6 +1,19 @@
-const mongoose = require('mongoose');
+import { Document, Schema, model } from "mongoose";
+import { Customer } from '../../customer/models/customer'
+import { Supplier } from "../../supplier/models/supplier";
 
-const Invoice = new mongoose.Schema({
+// Invoice interface
+interface Invoice extends Document {
+    name: string,
+    customerId: Customer,
+    supplierId: Supplier,
+    currency: string,
+    amount: number,
+    invoiceDate: Date,
+    status: string
+}
+
+const invoiceSchema = new Schema<Invoice>({
     name: {
         type: String,
         required: true,
@@ -8,12 +21,12 @@ const Invoice = new mongoose.Schema({
         max: 255,
     },
     customerId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref: 'Customer',
         required: true
     },
     supplierId: {
-        type: mongoose.Schema.Types.ObjectId,
+        type: Schema.Types.ObjectId,
         ref: 'Supplier',
         required: true
     },
@@ -39,4 +52,5 @@ const Invoice = new mongoose.Schema({
     },
 });
 
-module.exports = mongoose.model("Invoice", Invoice)
+const invoiceModel = model("Invoice", invoiceSchema)
+export { invoiceModel, Invoice };

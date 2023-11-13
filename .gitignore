@@ -1,8 +1,6 @@
-# ignore ALL .pem files
-*.pem
-
-# ignore . files
-.*
+# ignore .env file
+.env
 
 # ignore node modules
 node_modules
+dist

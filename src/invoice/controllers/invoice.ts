@@ -1,11 +1,13 @@
-const Joi = require('joi');
-const mongoose = require("mongoose");
-const Customer = require('../../customer/models/customer');
-const Supplier = require('../../supplier/models/supplier');
-const Invoice = require('../models/invoice');
-const User = require('../../user/models/user');
+import Joi from 'joi';
+import mongoose from "mongoose";
+import { customerModel } from '../../customer/models/customer';
+import { supplierModel } from '../../supplier/models/supplier';
+import { invoiceModel } from '../models/invoice';
+import { userModel } from '../../user/models/user';
+import { Request, Response } from 'express';
+import { errors } from 'undici-types';
 
-module.exports.createByCustomer = async(req, res) => {
+export async function createByCustomer(req: Request, res: Response) {
     try {
         // VALIDATION SCHEMA
         const validationDict = {
@@ -22,29 +24,32 @@ module.exports.createByCustomer = async(req, res) => {
             return res.status(400).send(err.details[0].message);
         }
         // CHECKING IF INVOICE ALREADY EXISTS
-        const invoiceExists = await Invoice.findOne({ name: req.body.name });
+        const invoiceExists = await invoiceModel.findOne({ name: req.body.name });
         if (invoiceExists) {
             return res.status(400).send("Invoice already exists");
         }
         // CHECKING IF SUPPLIER IS VALID
-        const supp = await Supplier.findById(req.body.supplierId);
+        const supp = await supplierModel.findById(req.body.supplierId);
         if (!supp) {
             return res.status(400).send("Supplier does not exist");
     }
         // FIND WHO MAKE REQUEST AND VALIDATE ITS DATA
-        const user = await User.findById(req.userId);
+        const user = await userModel.findById(req.body.userId);
+        if (!user) {
+            return res.status(404).send("User does not exist");
+        }
         if (user.role != 'CUSTOMER') {
             return res.status(400).send("Your role is not customer, please choose another endpoint");
         }
         if (!user.customerId) {
             return res.status(400).send("Your user has empty customerId");
         }
-        const cus = await Customer.findById(user.customerId._id);
+        const cus = await customerModel.findById(user.customerId._id);
         if (!cus) {
             return res.status(400).send("Your user customerId is not valid");
         }
 
-        const newInvoice = new Invoice({
+        const newInvoice = new invoiceModel({
             name: req.body.name,
             customerId: user.customerId,
             supplierId: req.body.supplierId,
@@ -59,11 +64,11 @@ module.exports.createByCustomer = async(req, res) => {
         supp.save();
         return res.send("Invoice created successfully");
     } catch (err) {
-        return res.status(500).send(err.message);
+        return res.status(500).send((err as Error).message);
     }
 };
 
-module.exports.createBySupplier = async(req, res) => {
+export async function createBySupplier(req: Request, res: Response) {
     try {
         // VALIDATION SCHEMA
         const validationDict = {
@@ -80,30 +85,33 @@ module.exports.createBySupplier = async(req, res) => {
             return res.status(400).send(err.details[0].message);
         }
         // CHECKING IF INVOICE ALREADY EXISTS
-        const invoiceExists = await Invoice.findOne({ name: req.body.name });
+        const invoiceExists = await invoiceModel.findOne({ name: req.body.name });
         if (invoiceExists) {
             return res.status(400).send("Invoice already exists");
         }
         // CHECKING IF CUSTOMER IS VALID
-        const cus = await Customer.findById(req.body.customerId);
+        const cus = await customerModel.findById(req.body.customerId);
         if (!cus) {
             return res.status(400).send("Customer does not exist");
     }
 
         // FIND WHO MAKE REQUEST AND VALIDATE ITS DATA
-        const user = await User.findById(req.userId);
+        const user = await userModel.findById(req.body.userId);
+        if (!user) {
+            return res.status(404).send("User does not exist");
+        }
         if (user.role != 'SUPPLIER') {
             return res.status(400).send("Your role is not supplier, please choose another endpoint");
         }
         if (!user.supplierId) {
             return res.status(400).send("Your user has empty supplierId");
         }
-        const supp = await Supplier.findById(user.supplierId._id);
+        const supp = await supplierModel.findById(user.supplierId.id);
         if (!supp) {
             return res.status(400).send("Your user supplierId is not valid");
         }
 
-        const newInvoice = new Invoice({
+        const newInvoice = new invoiceModel({
             name: req.body.name,
             customerId: req.body.customerId,
             supplierId: user.supplierId,
@@ -118,19 +126,22 @@ module.exports.createBySupplier = async(req, res) => {
         supp.save();
         return res.send("Invoice created successfully");
     } catch (err) {
-        return res.status(500).send(err.message);
+        return res.status(500).send((err as Error).message);
     }
 };
 
-module.exports.getByIdByCustomer = async(req, res) => {
+export async function getByIdByCustomer(req: Request, res: Response) {
     try {
         // FIND WHO MAKE REQUEST AND VALIDATE ITS DATA
-        const user = await User.findById(req.userId);
+        const user = await userModel.findById(req.body.userId);
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
         if (user.role != 'CUSTOMER') {
             return res.status(400).send("Your role is not customer, please choose another endpoint");
         }
         const { invId } = req.params;
-        const invoice = await Invoice.findById(invId);
+        const invoice = await invoiceModel.findById(invId);
         if (!invoice) {
             return res.status(404).send("Invoice not found");
         }
@@ -140,18 +151,21 @@ module.exports.getByIdByCustomer = async(req, res) => {
         }
         return res.send(invoice);
     } catch (err) {
-        return res.status(500).send(err.message);
+        return res.status(500).send((err as Error).message);
     }
 };
 
-module.exports.getByIdBySupplier = async(req, res) => {
+export async function getByIdBySupplier(req: Request, res: Response) {
     try {
-        const user = await User.findById(req.userId);
+        const user = await userModel.findById(req.body.userId);
+        if (!user) {
+            return res.status(404).send("User not found");
+        }
         if (user.role != 'SUPPLIER') {
             return res.status(400).send("Your role is not supplier, please choose another endpoint");
         }
         const { invId } = req.params;
-        const invoice = await Invoice.findById(invId);
+        const invoice = await invoiceModel.findById(invId);
         if (!invoice) {
             return res.status(404).send("Invoice not found");
         }
@@ -161,44 +175,50 @@ module.exports.getByIdBySupplier = async(req, res) => {
         }
         return res.send(invoice);
     } catch (err) {
-        return res.status(500).send(err.message);
+        return res.status(500).send((err as Error).message);
     }
 };
 
-module.exports.getAllByCustomer = async(req, res) => {
+export async function getAllByCustomer(req: Request, res: Response) {
     try {
-        const user = await User.findById(req.userId);
+        const user = await userModel.findById(req.body.userId);
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
         if (user.role != 'CUSTOMER') {
             return res.status(400).send("Your role is not customer, please choose another endpoint");
         }
-        const invoices = await Invoice.find({ customerId: user.customerId });
+        const invoices = await invoiceModel.find({ customerId: user.customerId });
         if (invoices.length == 0) {
             return res.status(404).send("Invoices not found");
         }
         return res.send(invoices);
     } catch (err) {
-        return res.status(500).send(err.message);
+        return res.status(500).send((err as Error).message);
     }
 };
 
-module.exports.getAllBySupplier = async(req, res) => {
+export async function getAllBySupplier(req: Request, res: Response) {
     try {
         // CHECK IF THE SUPPLIER
-        const user = await User.findById(req.userId);
+        const user = await userModel.findById(req.body.userId);
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
         if (user.role != 'SUPPLIER') {
             return res.status(400).send("Your role is not supplier, please choose another endpoint");
         }
-        const invoices = await Invoice.find({ supplierId: user.supplierId });
+        const invoices = await invoiceModel.find({ supplierId: user.supplierId });
         if (invoices.length == 0) {
             return res.status(404).send("Invoices not found");
         }
         return res.send(invoices);
     } catch (err) {
-        return res.status(500).send(err.message);
+        return res.status(500).send((err as Error).message);
     }
 };
 
-exports.updateByCustomer = async (req, res) => {
+export async function updateByCustomer(req: Request, res: Response) {
     try {
         const validationDict = {
             name: Joi.string().min(2).max(255).required(),
@@ -214,12 +234,15 @@ exports.updateByCustomer = async (req, res) => {
             return res.status(400).send(err.details[0].message);
         }
         // CHECK IF THE CUSTOMER
-        const user = await User.findById(req.userId);
+        const user = await userModel.findById(req.body.userId);
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
         if (user.role != 'CUSTOMER') {
             return res.status(400).send("Your role is not customer, please choose another endpoint");
         }
         // CHECKING IF SUPPLIER IS VALID
-        const supplierExists = await Supplier.findById(req.body.supplierId);
+        const supplierExists = await supplierModel.findById(req.body.supplierId);
         if (!supplierExists) {
             return res.status(400).send("Supplier does not exist");
         }
@@ -233,14 +256,14 @@ exports.updateByCustomer = async (req, res) => {
             amount: req.body.amount,
             status: req.body.status,
         }
-        await Invoice.findByIdAndUpdate(invId, {$set: data}, { new: true });
+        await invoiceModel.findByIdAndUpdate(invId, {$set: data}, { new: true });
         return res.send("Invoice updated successfully");
-    } catch (error) {
-        return res.status(500).send(error.message);
+    } catch (err) {
+        return res.status(500).send((err as Error).message);
     }
 };
 
-exports.updateBySupplier = async (req, res) => {
+export async function updateBySupplier(req: Request, res: Response) {
     try {
         const validationDict = {
             name: Joi.string().min(2).max(255).required(),
@@ -256,12 +279,15 @@ exports.updateBySupplier = async (req, res) => {
             return res.status(400).send(err.details[0].message);
         }
         // CHECK IF THE SUPPLIER
-        const user = await User.findById(req.userId);
+        const user = await userModel.findById(req.body.userId);
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
         if (user.role != 'SUPPLIER') {
             return res.status(400).send("Your role is not supplier, please choose another endpoint");
         }
         // CHECKING IF CUSTOMER IS VALID
-        const customerExists = await Customer.findOne({ _id: req.body.customerId });
+        const customerExists = await customerModel.findOne({ _id: req.body.customerId });
         if (!customerExists) {
             return res.status(400).send("Customer does not exist");
         }
@@ -275,9 +301,9 @@ exports.updateBySupplier = async (req, res) => {
             amount: req.body.amount,
             status: req.body.status,
         }
-        await Invoice.findByIdAndUpdate(invId, {$set: data}, { new: true });
+        await invoiceModel.findByIdAndUpdate(invId, {$set: data}, { new: true });
         return res.send("Invoice updated successfully");
-    } catch (error) {
-        return res.status(500).send(error.message);
+    } catch (err) {
+        return res.status(500).send((err as Error).message);
     }
 };

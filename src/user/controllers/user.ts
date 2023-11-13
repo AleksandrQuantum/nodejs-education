@@ -1,8 +1,10 @@
-const bcrypt = require('bcrypt');
-const Joi = require('joi');
-const User = require('../models/user');
+import Joi from 'joi';
+import { userModel } from '../models/user';
+import { userCreate, getUserById } from '../service/user';
+import { Request, Response } from 'express';
+import { isValidObjectId } from 'mongoose';
 
-module.exports.create = async(req, res) => {
+export async function create(req: Request, res: Response) {
     // VALIDATION SCHEMA
     const createUserSchema = Joi.object({
         fname: Joi.string().min(2).max(255).required(),
@@ -21,40 +23,30 @@ module.exports.create = async(req, res) => {
             return res.status(400).send(err.details[0].message);
         }
         // CHECKING IF USER EMAIL ALREADY EXISTS
-        const emailExists = await User.findOne({ email: req.body.email });
+        const emailExists = await userModel.findOne({ email: req.body.email });
         if (emailExists) {
             return res.status(400).send("Email already exists");
         }
-        // HASHING THE PASS2
-        const salt = await bcrypt.genSalt(10);
-        hashedPassword = await bcrypt.hash(req.body.password, salt);
-
-        const newUser = new User({
-            fname: req.body.fname,
-            lname: req.body.lname,
-            email: req.body.email,
-            password: hashedPassword,
-            role: req.body.role,
-            customerId: req.body.customerId,
-            supplierId: req.body.supplierId,
-        });
-    
-        newUser.save();
+        // Create user
+        await userCreate(req.body);
         return res.send("User created successfully");
     } catch (err) {
-        return res.status(500).json(err.message);
+        return res.status(500).json((err as Error).message);
     }
 };
 
-module.exports.getById = async(req, res) => {
+export async function getById(req: Request, res: Response) {
     try {
         const { userId } = req.params;
-        const user = await User.findById(userId);
+        if (!isValidObjectId(userId)) {
+            return res.status(400).send("Invalid userId");
+        }
+        const user = await getUserById(userId);
         if (!user) {
             return res.status(404).send("User not found");
         }
         return res.send(user);
     } catch (err) {
-        return res.status(500).send(err.message);
+        return res.status(500).send((err as Error).message);
     }
 };

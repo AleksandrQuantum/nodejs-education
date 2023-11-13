@@ -1,13 +1,13 @@
-const chai = require('chai');
-const chaiHttp = require('chai-http');
-const app = require('../src');
-const userTest = require('../tests/user.test');
+import chai, { expect } from 'chai';
+import chaiHttp from 'chai-http';
+import { app } from '../src';
+import { userCreate, userDelete } from '../tests/user.test';
 
 // Configure Chai
 chai.use(chaiHttp);
 chai.should();
 
-function sendRequest(data) {
+function sendRequest(data: { [key: string]: string }) {
     return chai.request(app)
             .get('/login')
             .send(data)
@@ -15,16 +15,18 @@ function sendRequest(data) {
 
 describe('Auth /login', () => {
     it('get a auth token, should get 200 status', async () => {
-        const [Bob, token] = await userTest.userCreate();
+        const { Bob } = await userCreate();
         const data = {
             email: Bob.email,
             password: 'testpassword'
         }
 
         const res = await sendRequest(data);
+        console.log(res.text)
         res.should.have.status(200);
-        res.headers.auth-token.should.be.to.string(token);
-        await userTest.userDelete(Bob.id);
+        res.headers['auth-token'].should.to.not.be.null;
+        expect(res.headers['auth-token']).to.be.string(res.text);
+        await userDelete(Bob.id);
     });
 
     it('invalid email, should get 400 status', async () => {
@@ -47,17 +49,17 @@ describe('Auth /login', () => {
     });
 
     it('without pass, should get 400 status', async () => {
-        const [Bob] = await userTest.userCreate()
+        const { Bob } = await userCreate()
         const data = { email: Bob.email }
 
         const res = await sendRequest(data);
         res.should.have.status(400);
         res.text.should.be.to.string('"password" is required');
-        await userTest.userDelete(Bob.id);
+        await userDelete(Bob.id);
     });
 
     it('invalid password, should get 400 status', async () => {
-        const [Bob] = await userTest.userCreate()
+        const { Bob } = await userCreate()
         const data = {
             email: Bob.email,
             password: 'some invalid pass'
@@ -66,6 +68,6 @@ describe('Auth /login', () => {
         const res = await sendRequest(data);
         res.should.have.status(400);
         res.text.should.include('Incorrect password');
-        await userTest.userDelete(Bob.id);
+        await userDelete(Bob.id);
     });
 });

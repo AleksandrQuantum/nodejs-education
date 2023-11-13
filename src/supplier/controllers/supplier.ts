@@ -1,8 +1,9 @@
-const Joi = require('joi');
-const Supplier = require('../models/supplier');
-const User = require('../../user/models/user');
+import Joi from 'joi';
+import { supplierModel } from '../models/supplier';
+import { userModel } from '../../user/models/user';
+import { Request, Response } from 'express' 
 
-module.exports.create = async(req, res) => {
+export async function create(req: Request, res: Response) {
     // VALIDATION SCHEMA
     const createSupplierSchema = Joi.object({
         name: Joi.string().min(2).max(255).required(),
@@ -20,12 +21,12 @@ module.exports.create = async(req, res) => {
         }
 
         // CHECKING IF SUPPLIER EMAIL ALREADY EXISTS
-        const emailExists = await Supplier.findOne({ email: req.body.email });
+        const emailExists = await supplierModel.findOne({ email: req.body.email });
         if (emailExists) {
             return res.status(400).send("Email already exists");
         }
 
-        const newSupplier = new Supplier({
+        const newSupplier = new supplierModel({
             name: req.body.name,
             address: req.body.address,
             email: req.body.email,
@@ -35,29 +36,32 @@ module.exports.create = async(req, res) => {
         });
 
         // SET ROLE FOR USER
-        const user = await User.findById(req.body.userId);
+        const user = await userModel.findById(req.body.userId);
+        if (!user) {
+            return res.status(404).send(`User '${req.body.userId}' not found`)
+        }
         if (user.role) {
             return res.status(400).send(`User '${req.body.userId}' already has role`);
         }
         user.role = 'SUPPLIER';
-        user.supplierId = newSupplier._id;
+        user.supplierId = newSupplier.id;
         user.save();
         newSupplier.save();
         return res.send("Supplier created successfully");
     } catch (err) {
-        return res.status(500).send(err.message);
+        return res.status(500).send((err as Error).message);
     }
 };
 
-module.exports.getById = async(req, res) => {
+export async function getById(req: Request, res: Response) {
     try {
         const { supId } = req.params;
-        const supplier = await Supplier.findById(supId);
+        const supplier = await supplierModel.findById(supId);
         if (!supplier) {
             return res.status(404).send("Supplier not found");
         }
         return res.send(supplier);
     } catch (err) {
-        return res.status(500).send(err.message);
+        return res.status(500).send((err as Error).message);
     }
 };

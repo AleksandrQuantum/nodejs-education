@@ -1,20 +1,19 @@
-const chai = require('chai');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
-const chaiHttp = require('chai-http');
-const app = require('../src');
-const User = require('../src/user/models/user');
-const assert = require("assert");
+import chai, { expect } from 'chai';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
+import chaiHttp from 'chai-http';
+import { app } from '../src';
+import { userModel, User } from '../src/user/models/user';
 
 // Configure Chai
 chai.use(chaiHttp);
 chai.should();
 
 // Create user
-async function userCreate() {
-    hash = bcrypt.hashSync('testpassword', 10);
-    const Bob = new User({
+async function userCreate(): Promise<{ Bob: User; token: string; }> {
+    const hash = bcrypt.hashSync('testpassword', 10);
+    const Bob = new userModel({
         _id: new mongoose.Types.ObjectId().toHexString(),
         fname: 'Bob',
         lname: 'Robinson',
@@ -22,24 +21,24 @@ async function userCreate() {
         password: hash
     });
     await Bob.save();
-    const token = jwt.sign({_id: Bob._id}, process.env.TOKEN_SECRET);
+    const token = jwt.sign({_id: Bob._id}, process.env.TOKEN_SECRET as string);
     return new Promise(function(resolve, reject) {
-        resolve([ Bob, token]);
+        resolve({ Bob, token });
     });
 }
 
 // Delete user
-async function userDelete(userId) {
-    await User.findByIdAndDelete(userId);
+async function userDelete(userId: string) {
+    await userModel.findByIdAndDelete(userId);
 }
 
-function sendRequestUserCreate(data) {
+function sendRequestUserCreate(data: { [key:string]: string }) {
     return chai.request(app)
             .post('/users/create')
             .send(data)
 }
 
-function sendRequestUserGet(userId, token) {
+function sendRequestUserGet(userId: string, token: string) {
     return chai.request(app)
             .get(`/users/get/${userId}`)
             .set('Auth-Token', token)
@@ -48,7 +47,7 @@ function sendRequestUserGet(userId, token) {
 describe('User /users', () => {
     describe('User /get/:userId', () => {
         it('without token, should get 401 status', async () => {
-            const [Bob] = await userCreate();
+            const { Bob } = await userCreate();
 
             const res = await sendRequestUserGet(Bob.id, '');
             res.should.have.status(401);
@@ -56,16 +55,17 @@ describe('User /users', () => {
             await userDelete(Bob.id);
         });
 
-        it('invalid userId, should get 500 status', async() => {
-            const [Bob, token] = await userCreate();
+        it('invalid userId, should get 400 status', async() => {
+            const { Bob, token } = await userCreate();
 
-            const res = await sendRequestUserGet(1, token);
-            res.should.have.status(500);
+            const res = await sendRequestUserGet("1", token);
+            res.should.have.status(400);
+            res.text.should.be.to.string("Invalid userId");
             await userDelete(Bob.id);
         });
 
         it('valid, should get 200 status', async () => {
-            const [Bob, token] = await userCreate();
+            const { Bob, token } = await userCreate();
 
             const res = await sendRequestUserGet(Bob.id, token);
             res.should.have.status(200);
@@ -77,7 +77,7 @@ describe('User /users', () => {
         });
 
         it('valid but another userId, should get 404 status', async () => {
-            const [Bob, token] = await userCreate();
+            const { Bob, token } = await userCreate();
 
             const res = await sendRequestUserGet(new mongoose.Types.ObjectId().toHexString(), token);
             res.should.have.status(404);
@@ -101,20 +101,21 @@ describe('User /users', () => {
             res.should.have.status(200);
             res.text.should.be.to.string('User created successfully');
             // Find user in the database and validate its data
-            const user = await User.findOne({ email: data['email'] });
-            const compared = await bcrypt.compare(data['password'], user.password);
-            user.fname.should.equal(data['fname']);
-            user.lname.should.equal(data['lname']);
-            user.email.should.equal(data['email']);
-            user.role.should.equal(data['role']);
-            assert.equal(user.customerId._id, data['customerId']);
-            assert.equal(user.supplierId, null);
+            const user = await userModel.findOne({ email: data['email'] });
+            expect(user).to.not.be.null;
+            const compared = await bcrypt.compare(data['password'], (user as User).password);
+            (user as User).fname.should.equal(data['fname']);
+            (user as User).lname.should.equal(data['lname']);
+            (user as User).email.should.equal(data['email']);
+            (user as User).role.should.equal(data['role']);
+            expect((user as User).customerId.toString()).to.equal(data['customerId']);
+            expect((user as User).supplierId).to.be.undefined;
             compared.should.equal(true);
-            await userDelete(user.id);
+            await userDelete((user as User).id);
         });
 
         it('user already exists, should get 400 status', async() => {
-            const [Bob] = await userCreate();
+            const { Bob } = await userCreate();
             const data = {
                 "lname": "Robinson",
                 "fname": "Bob",
@@ -146,5 +147,4 @@ describe('User /users', () => {
     });
 });
 
-exports.userCreate = userCreate;
-exports.userDelete = userDelete;
+export { userCreate, userDelete };
